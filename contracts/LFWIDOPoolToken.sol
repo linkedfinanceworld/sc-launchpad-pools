@@ -9,8 +9,6 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "hardhat/console.sol";
-
 contract LFWIDOPoolToken is 
         Context,
         Ownable,
@@ -109,10 +107,12 @@ contract LFWIDOPoolToken is
      */    
     function pendingReward(address _usr) public view returns (uint256) {
         UserInfo storage user = userInfo[_usr];
-        console.log("user.stakeTime: ", user.stakeTime);
-        console.log("user.claimTime: ", user.claimTime);
-        console.log("block.number: ", block.number);
-        uint256 timePeriod = block.number.sub(user.stakeTime).sub(user.claimTime);
+        uint256 timePeriod;
+        if (user.claimTime != 0) {
+            timePeriod = block.number.sub(user.claimTime);
+        } else {
+            timePeriod = block.number.sub(user.stakeTime);
+        }
         uint256 numerator = user.stakeAmount.mul(apy).div(100);
         uint256 var_ = numerator.div(block1Year);
         uint256 userTotalReward = var_.mul(timePeriod);
