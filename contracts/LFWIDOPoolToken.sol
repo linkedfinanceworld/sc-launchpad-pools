@@ -34,13 +34,13 @@ contract LFWIDOPoolToken is
     address internal LFW_CASTLE_FACTORY;
 
     // 7 days to block
-    uint256 internal constant BLOCK_COUNT_OF_7_DAYS = 201600;
+    uint256 internal constant BLOCK_COUNT_IN_7_DAYS = 201600;
 
     // 30 days to block
-    uint256 internal constant BLOCK_COUNT_OF_30_DAYS = 864000;
+    uint256 internal constant BLOCK_COUNT_IN_30_DAYS = 864000;
 
     // 1 year block to calculate apy
-    uint256 internal constant BLOCK_COUNT_OF_1_YEAR = 10512000;
+    uint256 internal constant BLOCK_COUNT_IN_1_YEAR = 10512000;
 
     // Whether it is initialized
     bool internal isInitialized;
@@ -64,17 +64,16 @@ contract LFWIDOPoolToken is
     uint256 userListLength = userList.length; // TODO is it redundant?
 
     struct UserInfo {
-        uint256 stakeTime;
+        uint256 stakingTime;
         uint256 lockTime;
         uint256 unlockTime;
-        uint256 claimTime;
-        uint256 stakeAmount;
+        uint256 lastClaimingTime;
+        uint256 stakedAmount;
         bool isLocked;
     }
 
     constructor() {
         LFW_CASTLE_FACTORY = msg.sender; // TODO do we have a better name?
-
     }
 
     /*
@@ -109,16 +108,19 @@ contract LFWIDOPoolToken is
      * @notice calculate the pending reward of user
      * @param _user: user address
      */    
-    function pendingReward(address _usr) public view returns (uint256) {
+    function pendingReward(address _usr) internal returns (uint256) {
         UserInfo storage user = userInfo[_usr];
+        uint256 currentBlock = block.number;
         uint256 timePeriod;
-        if (user.claimTime != 0) {
-            timePeriod = block.number.sub(user.claimTime);
+        // if user has claimed, then timePeriod is count from the last time user claimed
+        if (user.lastClaimingTime != 0) {
+            timePeriod = currentBlock.sub(user.lastClaimingTime);
+            user.lastClaimingTime = currentBlock;
         } else {
-            timePeriod = block.number.sub(user.stakeTime);
+            timePeriod = currentBlock.sub(user.stakingTime);
         }
-        uint256 numerator = user.stakeAmount.mul(apy).div(100);
-        uint256 var_ = numerator.div(BLOCK_COUNT_OF_1_YEAR);
+        uint256 numerator = user.stakedAmount.mul(apy).div(100);
+        uint256 var_ = numerator.div(BLOCK_COUNT_IN_1_YEAR);
         uint256 userTotalReward = var_.mul(timePeriod);
         return userTotalReward;
     }
@@ -133,12 +135,12 @@ contract LFWIDOPoolToken is
         UserInfo storage user = userInfo[msg.sender];
 
         // Push address in list
-        if (user.stakeAmount == 0) {
+        if (user.stakedAmount == 0) {
             userList.push(address(msg.sender));
         }
 
         // Receive old reward first to recalculate new reward
-        if (user.stakeAmount > 0) {
+        if (user.stakedAmount > 0) {
             uint256 pending = pendingReward(address(msg.sender));
             ERC20(stakedToken).transfer(
                 address(msg.sender),
@@ -148,7 +150,7 @@ contract LFWIDOPoolToken is
 
         // Stake token 
         if (_amount > 0) {
-            user.stakeAmount = user.stakeAmount.add(_amount);
+            user.stakedAmount = user.stakedAmount.add(_amount);
             IERC20(stakedToken).transferFrom(
                 address(msg.sender),
                 address(this),
@@ -157,9 +159,10 @@ contract LFWIDOPoolToken is
         }
 
         // Update user time variables
-        user.stakeTime = block.number;
-        user.lockTime = block.number.add(BLOCK_COUNT_OF_30_DAYS); // TODO better user.stakeTime.add(..)
-        user.unlockTime = block.number.add(BLOCK_COUNT_OF_30_DAYS).add(BLOCK_COUNT_OF_7_DAYS);
+        uint256 currentBlock = block.number;
+        user.stakingTime = currentBlock;
+        user.lockTime = currentBlock.add(BLOCK_COUNT_IN_30_DAYS); // TODO better user.stakeTime.add(..)
+        user.unlockTime = currentBlock.add(BLOCK_COUNT_IN_30_DAYS).add(BLOCK_COUNT_IN_7_DAYS);
         user.isLocked = true;
         emit Stake(address(msg.sender), _amount);
     }
@@ -171,11 +174,12 @@ contract LFWIDOPoolToken is
     function locked() external nonReentrant {
         UserInfo storage user = userInfo[msg.sender];
         require(
-            user.stakeAmount > 0, 
+            user.stakedAmount > 0, 
             "You do not stake anything"
         );
-        user.lockTime = block.number.add(BLOCK_COUNT_OF_30_DAYS);
-        user.unlockTime = block.number.add(BLOCK_COUNT_OF_30_DAYS).add(BLOCK_COUNT_OF_7_DAYS);
+        uint256 currentBlock = block.number;
+        user.lockTime = currentBlock.add(BLOCK_COUNT_IN_30_DAYS);
+        user.unlockTime = currentBlock.add(BLOCK_COUNT_IN_30_DAYS).add(BLOCK_COUNT_IN_7_DAYS);
         user.isLocked = true;
     }
 
@@ -186,7 +190,7 @@ contract LFWIDOPoolToken is
     function unStake(uint256 _amount) external nonReentrant {
         UserInfo storage user = userInfo[msg.sender];
         require(
-            user.stakeAmount >= _amount, 
+            user.stakedAmount >= _amount, 
             "You do not stake enough to withdraw such amount"
         );
         require(
@@ -199,7 +203,7 @@ contract LFWIDOPoolToken is
         );
 
         // Receive old reward first to recalculate new reward
-        if (user.stakeAmount > 0) {
+        if (user.stakedAmount > 0) {
             uint256 pending = pendingReward(address(msg.sender));
             ERC20(stakedToken).transfer(
                 address(msg.sender),
@@ -209,7 +213,7 @@ contract LFWIDOPoolToken is
 
         // Transfer LFW to user
         ERC20(stakedToken).transfer(address(msg.sender), _amount);
-        user.stakeAmount = user.stakeAmount.sub(_amount);
+        user.stakedAmount = user.stakedAmount.sub(_amount);
 
         // If unstake => user does not lock his/her token anymore
         user.isLocked = false;
@@ -223,12 +227,10 @@ contract LFWIDOPoolToken is
     function claim() external nonReentrant {
         UserInfo storage user = userInfo[msg.sender];
         require(
-            user.stakeAmount > 0, 
+            user.stakedAmount > 0, 
             "You do not stake anything"
         );
 
-        // Update claim time to recalculate pending reward
-        user.claimTime = block.number;
         uint256 pending = pendingReward(address(msg.sender));
         ERC20(stakedToken).transfer(address(msg.sender), pending);
         emit Claimed(address(msg.sender), pending);
