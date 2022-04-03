@@ -9,6 +9,8 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+import "hardhat/console.sol";
+
 contract LFWIDOPoolToken is 
         Context,
         Ownable,
@@ -19,8 +21,9 @@ contract LFWIDOPoolToken is
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
-    // bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
-    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
+    // bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00; // TODO is it redundant?
+    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE"); // TODO is it redundant?
+
 
     event Stake(address indexed wallet, uint256 amount);
     event Unstake(address indexed user, uint256 amount);
@@ -28,37 +31,37 @@ contract LFWIDOPoolToken is
     event ChangeAPYvalue(uint256 amount);
 
     // The address of the smart chef factory
-    address public LFW_CASTLE_FACTORY;
+    address internal LFW_CASTLE_FACTORY;
 
     // 7 days to block
-    uint256 block7Days = 201600;
+    uint256 internal constant BLOCK_COUNT_OF_7_DAYS = 201600;
 
     // 30 days to block
-    uint256 block30Days = 864000;
+    uint256 internal constant BLOCK_COUNT_OF_30_DAYS = 864000;
 
     // 1 year block to calculate apy
-    uint256 block1Year = 10512000;
+    uint256 internal constant BLOCK_COUNT_OF_1_YEAR = 10512000;
 
     // Whether it is initialized
-    bool public isInitialized;
+    bool internal isInitialized;
 
-    // Whether the pool's staked token balance can be remove by owner
+    // Whether the pool's staked token balance can be removed by owner
     bool private isRemovable;
 
     // The staked token
     ERC20 public stakedToken;
 
     // APY
-    uint256 apy;
+    uint256 public apy;
 
     // Info of each user that stakes tokens (stakedToken)
-    mapping(address => UserInfo) public userInfo;
+    mapping(address => UserInfo) internal userInfo;
     
     // user list
-    address[] public userList;
+    address[] internal userList;
 
     // length of List
-    uint256 userListLength = userList.length;
+    uint256 userListLength = userList.length; // TODO is it redundant?
 
     struct UserInfo {
         uint256 stakeTime;
@@ -70,7 +73,8 @@ contract LFWIDOPoolToken is
     }
 
     constructor() {
-        LFW_CASTLE_FACTORY = msg.sender;
+        LFW_CASTLE_FACTORY = msg.sender; // TODO do we have a better name?
+
     }
 
     /*
@@ -114,7 +118,7 @@ contract LFWIDOPoolToken is
             timePeriod = block.number.sub(user.stakeTime);
         }
         uint256 numerator = user.stakeAmount.mul(apy).div(100);
-        uint256 var_ = numerator.div(block1Year);
+        uint256 var_ = numerator.div(BLOCK_COUNT_OF_1_YEAR);
         uint256 userTotalReward = var_.mul(timePeriod);
         return userTotalReward;
     }
@@ -154,8 +158,8 @@ contract LFWIDOPoolToken is
 
         // Update user time variables
         user.stakeTime = block.number;
-        user.lockTime = block.number.add(block30Days);
-        user.unlockTime = block.number.add(block30Days).add(block7Days);
+        user.lockTime = block.number.add(BLOCK_COUNT_OF_30_DAYS); // TODO better user.stakeTime.add(..)
+        user.unlockTime = block.number.add(BLOCK_COUNT_OF_30_DAYS).add(BLOCK_COUNT_OF_7_DAYS);
         user.isLocked = true;
         emit Stake(address(msg.sender), _amount);
     }
@@ -170,8 +174,8 @@ contract LFWIDOPoolToken is
             user.stakeAmount > 0, 
             "You do not stake anything"
         );
-        user.lockTime = block.number.add(block30Days);
-        user.unlockTime = block.number.add(block30Days).add(block7Days);
+        user.lockTime = block.number.add(BLOCK_COUNT_OF_30_DAYS);
+        user.unlockTime = block.number.add(BLOCK_COUNT_OF_30_DAYS).add(BLOCK_COUNT_OF_7_DAYS);
         user.isLocked = true;
     }
 
@@ -247,9 +251,9 @@ contract LFWIDOPoolToken is
      * @notice claim LFW reward
      * @param apy_: new APY
      */       
-    function changeAPY(uint256 apy_) external onlyOwner {
-        apy = apy_;
-        emit ChangeAPYvalue(apy_);
+    function changeAPY(uint256 _apy) external onlyOwner {
+        apy = _apy;
+        emit ChangeAPYvalue(_apy);
     }
 
     /*
