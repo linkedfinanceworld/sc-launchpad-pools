@@ -69,9 +69,8 @@ contract LFWIDOPoolToken is
         bool _isRemovable,
         uint256 apy_,
         address _admin
-    ) external {
+    ) external onlyOwner {
         require(!isInitialized, "Already initialized");
-        require(msg.sender == LFW_CASTLE_FACTORY, "Not factory");
 
         require(address(_stakedToken) != address(0), "Invalid address");
         require(address(_admin) != address(0), "Invalid address");
