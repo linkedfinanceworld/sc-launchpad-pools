@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-
 import "hardhat/console.sol";
 
 contract LFWIDOPoolToken is 
@@ -21,23 +20,14 @@ contract LFWIDOPoolToken is
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
-    // bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00; // TODO is it redundant?
-    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE"); // TODO is it redundant?
-
 
     event Stake(address indexed wallet, uint256 amount);
     event Unstake(address indexed user, uint256 amount);
     event Claimed(address indexed wallet, uint256 amount);
     event ChangeAPYvalue(uint256 amount);
 
-    // The address of the smart chef factory
-    address internal LFW_CASTLE_FACTORY;
-
-    // 7 days to block
-    uint256 internal constant BLOCK_COUNT_IN_7_DAYS = 201600;
-
     // 30 days to block
-    uint256 internal constant BLOCK_COUNT_IN_30_DAYS = 864000;
+    uint256 internal constant BLOCK_COUNT_IN_14_DAYS = 403200;
 
     // 1 year block to calculate apy
     uint256 internal constant BLOCK_COUNT_IN_1_YEAR = 10512000;
@@ -60,20 +50,11 @@ contract LFWIDOPoolToken is
     // user list
     address[] internal userList;
 
-    // length of List
-    uint256 userListLength = userList.length; // TODO is it redundant?
-
     struct UserInfo {
         uint256 stakingTime;
         uint256 lockTime;
-        uint256 unlockTime;
         uint256 lastClaimingTime;
         uint256 stakedAmount;
-        bool isLocked;
-    }
-
-    constructor() {
-        LFW_CASTLE_FACTORY = msg.sender; // TODO do we have a better name?
     }
 
     /*
@@ -161,27 +142,10 @@ contract LFWIDOPoolToken is
         // Update user time variables
         uint256 currentBlock = block.number;
         user.stakingTime = currentBlock;
-        user.lockTime = currentBlock.add(BLOCK_COUNT_IN_30_DAYS); // TODO better user.stakeTime.add(..)
-        user.unlockTime = currentBlock.add(BLOCK_COUNT_IN_30_DAYS).add(BLOCK_COUNT_IN_7_DAYS);
-        user.isLocked = true;
+        user.lockTime = currentBlock.add(BLOCK_COUNT_IN_14_DAYS); 
         emit Stake(address(msg.sender), _amount);
     }
 
-
-    /*
-     * @notice locked the pool 30 days, should be called by user
-     */    
-    function locked() external nonReentrant {
-        UserInfo storage user = userInfo[msg.sender];
-        require(
-            user.stakedAmount > 0, 
-            "You do not stake anything"
-        );
-        uint256 currentBlock = block.number;
-        user.lockTime = currentBlock.add(BLOCK_COUNT_IN_30_DAYS);
-        user.unlockTime = currentBlock.add(BLOCK_COUNT_IN_30_DAYS).add(BLOCK_COUNT_IN_7_DAYS);
-        user.isLocked = true;
-    }
 
     /*
      * @notice unstake LFW
@@ -195,11 +159,7 @@ contract LFWIDOPoolToken is
         );
         require(
             user.lockTime < block.number,
-            "Your token is still at the 30-days locked period!"
-        );
-        require(
-            user.unlockTime > block.number, 
-            "Exceed 7days for unstaking after locked period, please lock your token and wait for next month"
+            "Your token is still at the 14-days locked period!"
         );
 
         // Receive old reward first to recalculate new reward
@@ -214,9 +174,6 @@ contract LFWIDOPoolToken is
         // Transfer LFW to user
         ERC20(stakedToken).transfer(address(msg.sender), _amount);
         user.stakedAmount = user.stakedAmount.sub(_amount);
-
-        // If unstake => user does not lock his/her token anymore
-        user.isLocked = false;
 
         emit Unstake(address(msg.sender), _amount);
     }
@@ -256,6 +213,14 @@ contract LFWIDOPoolToken is
     function changeAPY(uint256 _apy) external onlyOwner {
         apy = _apy;
         emit ChangeAPYvalue(_apy);
+    }
+
+    /*
+     * @notice claim LFW reward
+     * @param apy_: new APY
+     */       
+    function setRemovePool(bool _remove) external onlyOwner {
+        isRemovable = _remove; 
     }
 
     /*
