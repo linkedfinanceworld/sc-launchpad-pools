@@ -68,7 +68,7 @@ describe("LFWIDOPoolToken", function () {
 
     it ("normal user fails to reinitalize the pool", async function () {
         await expect(poolToken.connect(user).initialize(tokenLFW.address, false, 10, user.address))
-            .to.be.revertedWith("Already initialized")
+            .to.be.revertedWith("Ownable: caller is not the owner")
     });
 
     it ("owner changes APY sucesfully", async function () {
@@ -100,9 +100,9 @@ describe("LFWIDOPoolToken", function () {
         const userTokenBalance1 = await tokenLFW.balanceOf(user.address);
         console.log("Amount of LFW that the user owns: ", formatEther(userTokenBalance1));
 
-        console.log("block before fast-winding 3 days: ", await ethers.provider.getBlockNumber());
+        console.log("block number before fast-winding 3 days: ", await ethers.provider.getBlockNumber());
         await ethers.provider.send("hardhat_mine", ["0x15180"]); // block count of 3 days
-        console.log("block after fast-winding 3 days: ", await ethers.provider.getBlockNumber());
+        console.log("block number after fast-winding 3 days: ", await ethers.provider.getBlockNumber());
 
         console.log("user claims reward");
         await expect(await poolToken.connect(user).claim())
@@ -114,14 +114,14 @@ describe("LFWIDOPoolToken", function () {
 
     });
 
-    it("fail to unstake before 30 days expired", async function () {
+    it("fail to unstake before 14 days expired", async function () {
         const userTokenBalance = await tokenLFW.balanceOf(user.address);
         console.log("Amount of LFW that the user owns: ", formatEther(userTokenBalance));
         await expect(poolToken.connect(user).unStake(BigNumber.from(10).mul(etherUnit)))
-            .to.be.revertedWith("Your token is still at the 30-days locked period!");
+            .to.be.revertedWith("Your token is still at the 14-days locked period!");
     });
 
-    it("unstake after 30 days succesfully", async function () {
+    it("unstake after 14 days succesfully", async function () {
         console.log("block before fast-winding 30days: ", await ethers.provider.getBlockNumber());
         await ethers.provider.send("hardhat_mine", ["0xD2F00"]); // block count of 30 days
         console.log("block after fast-winding 30days: ", await ethers.provider.getBlockNumber());
