@@ -67,11 +67,10 @@ contract LFWIDOPoolToken is
     function initialize(
         ERC20 _stakedToken,
         bool _isRemovable,
-        uint256 apy_,
+        uint256 _apy,
         address _admin
     ) external onlyOwner {
         require(!isInitialized, "Already initialized");
-
         require(address(_stakedToken) != address(0), "Invalid address");
         require(address(_admin) != address(0), "Invalid address");
 
@@ -79,30 +78,31 @@ contract LFWIDOPoolToken is
         isInitialized = true;
         stakedToken = _stakedToken;
         isRemovable = _isRemovable;
-        apy = apy_;
+        apy = _apy;
         // Transfer ownership to the admin address who becomes owner of the contract
         transferOwnership(_admin);
     }
 
     /*
-     * @notice calculate the pending reward of user
-     * @param _user: user address
+     * @notice calculate the pending reward of user up till a cerntain time
+     * @param userAddress: the address of user who are receiving reward
+     * @param blockNumber: the block number as the point for reward calculation
      */    
-    function pendingReward(address _usr) internal returns (uint256) {
-        UserInfo storage user = userInfo[_usr];
-        uint256 currentBlock = block.number;
-        uint256 timePeriod;
-        // if user has claimed, then timePeriod is count from the last time user claimed
+    function calculatePendingReward(address userAddress, uint256 blockNumber) internal view returns (uint256) {
+        UserInfo storage user = userInfo[userAddress];
+        uint256 stakingPeriod;
+        
         if (user.lastClaimingTime != 0) {
-            timePeriod = currentBlock.sub(user.lastClaimingTime);
-            user.lastClaimingTime = currentBlock;
+            // if user has claimed, then staking period counts from the last time user claimed
+            stakingPeriod = blockNumber.sub(user.lastClaimingTime);
         } else {
-            timePeriod = currentBlock.sub(user.stakingTime);
+            // if user hasn't claimed, then staking period counts from the time user staked
+            stakingPeriod = blockNumber.sub(user.stakingTime);
         }
-        uint256 numerator = user.stakedAmount.mul(apy).div(100);
-        uint256 var_ = numerator.div(BLOCK_COUNT_IN_1_YEAR);
-        uint256 userTotalReward = var_.mul(timePeriod);
-        return userTotalReward;
+
+        uint256 rewardIn1Year = user.stakedAmount.mul(apy).div(100);
+        uint256 rewardInStakingPeriod = rewardIn1Year.mul(stakingPeriod).div(BLOCK_COUNT_IN_1_YEAR);
+        return rewardInStakingPeriod;
     }
 
     /*
@@ -121,7 +121,7 @@ contract LFWIDOPoolToken is
 
         // Receive old reward first to recalculate new reward
         if (user.stakedAmount > 0) {
-            uint256 pending = pendingReward(address(msg.sender));
+            uint256 pending = calculatePendingReward(address(msg.sender), block.number);
             ERC20(stakedToken).transfer(
                 address(msg.sender),
                 pending
@@ -163,7 +163,7 @@ contract LFWIDOPoolToken is
 
         // Receive old reward first to recalculate new reward
         if (user.stakedAmount > 0) {
-            uint256 pending = pendingReward(address(msg.sender));
+            uint256 pending = calculatePendingReward(address(msg.sender), block.number);
             ERC20(stakedToken).transfer(
                 address(msg.sender),
                 pending
@@ -186,8 +186,9 @@ contract LFWIDOPoolToken is
             user.stakedAmount > 0, 
             "You do not stake anything"
         );
-
-        uint256 pending = pendingReward(address(msg.sender));
+        uint256 currentBlock = block.number;
+        uint256 pending = calculatePendingReward(address(msg.sender), currentBlock);
+        user.lastClaimingTime = currentBlock;
         ERC20(stakedToken).transfer(address(msg.sender), pending);
         emit Claimed(address(msg.sender), pending);
     }
