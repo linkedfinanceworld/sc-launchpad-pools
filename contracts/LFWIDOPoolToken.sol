@@ -36,7 +36,7 @@ contract LFWIDOPoolToken is
     bool internal isInitialized;
 
     // Whether the pool's staked token balance can be removed by owner
-    bool private isRemovable;
+    bool public isRemovable;
 
     // The staked token
     ERC20 public stakedToken;
@@ -45,10 +45,10 @@ contract LFWIDOPoolToken is
     uint256 public apy;
 
     // Info of each user that stakes tokens (stakedToken)
-    mapping(address => UserInfo) internal userInfo;
+    mapping(address => UserInfo) public userInfo;
     
     // user list
-    address[] internal userList;
+    address[] public userList;
 
     struct UserInfo {
         uint256 stakingTime;
