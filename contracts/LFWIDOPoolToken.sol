@@ -4,7 +4,6 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol"; 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol"; 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -16,14 +15,11 @@ contract LFWIDOPoolToken is
         ReentrancyGuard, 
         ERC20("LFW-IDO-Pool-Token", "LFW-IDO-Token") 
 {
-
-    using SafeERC20 for IERC20;
     using SafeMath for uint256;
-
 
     event Stake(address indexed wallet, uint256 amount);
     event Unstake(address indexed user, uint256 amount);
-    event Claimed(address indexed wallet, uint256 amount);
+    event Claim(address indexed wallet, uint256 amount);
     event ChangeAPYvalue(uint256 amount);
 
     // 30 days to block
@@ -127,14 +123,14 @@ contract LFWIDOPoolToken is
         UserInfo storage user = userInfo[msg.sender];
     
         // Push address in list
-        if (user.stakedAmount == 0) { // TODO better using stakingTime instead of stakedAmount?
+        if (user.stakedAmount == 0) { // TODO better using stakingTime instead of stakedAmount, because stakedAmount could be back to 0 at some point
             userList.push(address(msg.sender));
         }
 
         // Receive old reward first to recalculate new reward
         if (user.stakedAmount > 0) {
             uint256 reward = userClaimReward(address(msg.sender), currentBlock);
-            emit Claimed(address(msg.sender), reward);
+            emit Claim(address(msg.sender), reward);
         }
 
         // Stake token 
@@ -166,7 +162,7 @@ contract LFWIDOPoolToken is
         // Receive old reward first to recalculate new reward
         if (user.stakedAmount > 0) {
             uint256 reward = userClaimReward(address(msg.sender), currentBlock);
-            emit Claimed(address(msg.sender), reward);
+            emit Claim(address(msg.sender), reward);
         }
 
         // Transfer LFW to user
@@ -186,7 +182,7 @@ contract LFWIDOPoolToken is
             "You do not stake anything");
         
         uint256 reward = userClaimReward(address(msg.sender), currentBlock);
-        emit Claimed(address(msg.sender), reward);
+        emit Claim(address(msg.sender), reward);
     }
 
     /*

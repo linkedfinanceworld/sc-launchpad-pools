@@ -1,6 +1,5 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { network } from "hardhat";
 
 import {Contract, BigNumber, Wallet} from "ethers";
 import { formatEther } from "ethers/lib/utils";
@@ -105,7 +104,7 @@ describe("LFWIDOPoolToken", function () {
             // console.log("block number after fast-winding 3 days: ", await ethers.provider.getBlockNumber());
     
             await expect(poolToken.connect(user1).claim())
-                .to.emit(poolToken, 'Claimed');
+                .to.emit(poolToken, 'Claim');
         });
     
         it("user cannot unstake before 14 days expired", async function () {
@@ -126,7 +125,7 @@ describe("LFWIDOPoolToken", function () {
             // console.log("block number after fast-winding 14 days: ", await ethers.provider.getBlockNumber());
     
             await expect (poolToken.connect(user1).unStake(BigNumber.from(50).mul(etherUnit)))
-                .to.emit(poolToken, 'Claimed')
+                .to.emit(poolToken, 'Claim')
                 .to.emit(poolToken, 'Unstake')
                 .withArgs(user1.address, BigNumber.from(50).mul(etherUnit));
             
@@ -138,13 +137,19 @@ describe("LFWIDOPoolToken", function () {
         });
     });
 
-    describe("Testsuite 2 - Monitor balance of users with a chain of actions (Stake, Claim, Unstake)", function () {      
+    describe("Testsuite 2 - Monitor balance of users with a chain of actions (Stake, Claim, Unstake)", function () {
+        let stakingTime1 = 0; // block Number of the first staking Time
+        let unstakingTime1 = 0;
+        let stakingTime2 = 0;
+        let unstakingTime2 = 0;
         it("user stakes 1000 LFW at day-0", async function () {
             // make sure apy is set to 10
             await poolToken.changeAPY(10);
             expect(await poolToken.apy()).to.eq(10);
 
-            console.log("block number when user staking", await ethers.provider.getBlockNumber());
+            stakingTime1 = await ethers.provider.getBlockNumber();
+            console.log("block number when user is staking", stakingTime1);
+            
             const userTokenBalance = await tokenLFW.balanceOf(user2.address);
             console.log("Inital amount of LFW that the user owns: ", formatEther(userTokenBalance));
 
@@ -154,26 +159,23 @@ describe("LFWIDOPoolToken", function () {
 
             expect(await tokenLFW.balanceOf(user2.address)).to.equal(BigNumber.from(0).mul(etherUnit))
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
-            // console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
+            console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
         });
 
         it("user claims reward at day-5", async function () {
             await ethers.provider.send("hardhat_mine", ["0x23280"]); // block count of 5 days
-            const expectedReward = parseInt((1000*0.1*5/365).toString().replace(".","")) ;
-            // console.log(expectedReward);
             await expect(poolToken.connect(user2).claim())
-                .to.emit(poolToken, 'Claimed');
-                // .withArgs(user2.address, BigNumber.from(expectedReward).mul(1000));
+                .to.emit(poolToken, 'Claim');
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
-            // console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
+            console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
         });
 
         it("user claims reward at day-8", async function () {
             await ethers.provider.send("hardhat_mine", ["0x15180"]); // block count of 8-5=3 days
             await expect(poolToken.connect(user2).claim())
-                .to.emit(poolToken, 'Claimed');
+                .to.emit(poolToken, 'Claim');
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
-            // console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
+            console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
 
         });
 
@@ -183,32 +185,42 @@ describe("LFWIDOPoolToken", function () {
                 .to.be.revertedWith("Your token is still at the 14-days locked period!");
 
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
-            // console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
+            console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
 
         });
 
         it("user unstakes 600 LFW at day-14", async function () {
             await ethers.provider.send("hardhat_mine", ["0x7080"]); // block count of 14-13=1 day
+
+            unstakingTime1 = await ethers.provider.getBlockNumber();
+            console.log("block number when user is unstaking", unstakingTime1);
+
             await expect (poolToken.connect(user2).unStake(BigNumber.from(600).mul(etherUnit)))
-                .to.emit(poolToken, 'Claimed')
+                .to.emit(poolToken, 'Claim')
                 .to.emit(poolToken, 'Unstake')
                 .withArgs(user2.address, BigNumber.from(600).mul(etherUnit));
 
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
-            // console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
+            console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
+
+            const expectedReward = 1000*0.1*(unstakingTime1-stakingTime1) / 10512000; // number of block in 1 year = 10512000
             
+            // this is a work around to compare unstaked token + rewarded token with the balance
+            const tmp_value = BigNumber.from(Math.round((600 + expectedReward)*1e8)); 
+            const balance = await tokenLFW.balanceOf(user2.address);
+            expect(BigNumber.from(balance).div(BigNumber.from(10).pow(10))).to.equal(tmp_value);
         });
 
         it("user stakes 500 LFW at day-16", async function () {
             await ethers.provider.send("hardhat_mine", ["0xE100"]); // block count of 16-14=2 days
 
             await expect(poolToken.connect(user2).stake(BigNumber.from(500).mul(etherUnit)))
-                .to.emit(poolToken, 'Claimed')
+                .to.emit(poolToken, 'Claim')
                 .to.emit(poolToken, 'Stake')
                 .withArgs(user2.address, BigNumber.from(500).mul(etherUnit));
 
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
-            // console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
+            console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
             
         });
 
@@ -216,10 +228,10 @@ describe("LFWIDOPoolToken", function () {
             await ethers.provider.send("hardhat_mine", ["0xE100"]); // block count of 18-16=2 days
 
             await expect(poolToken.connect(user2).claim())
-                .to.emit(poolToken, 'Claimed');
+                .to.emit(poolToken, 'Claim');
 
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
-            // console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
+            console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
             
         });
 
@@ -234,12 +246,12 @@ describe("LFWIDOPoolToken", function () {
             await ethers.provider.send("hardhat_mine", ["0x7080"]); // block count of 30-29=1 day
 
             await expect (poolToken.connect(user2).unStake(BigNumber.from(900).mul(etherUnit)))
-                .to.emit(poolToken, 'Claimed')
+                .to.emit(poolToken, 'Claim')
                 .to.emit(poolToken, 'Unstake')
                 .withArgs(user2.address, BigNumber.from(900).mul(etherUnit));
 
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
-            // console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
+            console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
 
             // reward = 1000*0.1*14/365 + 400*0.1*2/365 + 900*0.1*14/365 = 7.50684931507
         });
