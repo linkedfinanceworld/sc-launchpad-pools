@@ -3,7 +3,7 @@
 //
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
-const hre = require("hardhat");
+import { ethers } from "hardhat";
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -14,19 +14,17 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const Mining = await hre.ethers.getContractFactory("LFWIDOPoolToken");
-  const mining = await Mining.deploy();
+  const LFWIDOPoolToken = await ethers.getContractFactory("LFWIDOPoolToken");
+  const poolToken = await LFWIDOPoolToken.deploy();
 
-  await mining.deployed();
+  await poolToken.deployed();
 
-  console.log("mining deployed to:", mining.address);
+  console.log("LFWIDOPoolToken deployed to:", poolToken.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

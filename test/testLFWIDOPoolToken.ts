@@ -253,7 +253,7 @@ describe("LFWIDOPoolToken", function () {
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
             console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
 
-            // reward = 1000*0.1*14/365 + 400*0.1*2/365 + 900*0.1*14/365 = 7.50684931507
+            console.log("roughly, reward = 1000*0.1*14/365 + 400*0.1*2/365 + 900*0.1*14/365 = 7.50684931507");
         });
     });
 
