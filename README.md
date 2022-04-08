@@ -1,3 +1,16 @@
+# install all the packages
+npm ci 
+# run unit test
+npx hardhat test 
+# change config before deployment
+make a copy of .env.example and rename the copy to .env . Fill in your private key, api key there before run deployment. Gitignore contains .env already, so your private key won't be pushed to git repo
+# run deploy
+npx hardhat run --network bsc_testnet .\scripts\deploy.ts 
+# run verify
+npx hardhat verify --network bsc_testnet {contract_address}
+
+
+
 # Advanced Sample Hardhat Project
 
 This project demonstrates an advanced Hardhat use case, integrating other tools commonly used alongside Hardhat in the ecosystem.
