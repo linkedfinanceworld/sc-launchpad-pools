@@ -37,7 +37,8 @@ describe("LFWIDOPoolToken", function () {
         console.log("user.address: ", user2.address);
 
         console.log("initalize LFW Staking Pool");
-        await poolToken.initialize(tokenLFW.address, false, 7, owner.address);
+        const currentBlock = await ethers.provider.getBlockNumber();
+        await poolToken.initialize(tokenLFW.address, false, 7, currentBlock, owner.address);
 
         // have pool an inital amount 1000 LFW tokens
         await tokenLFW.transfer(poolToken.address, BigNumber.from(1000).mul(etherUnit));
@@ -76,7 +77,8 @@ describe("LFWIDOPoolToken", function () {
 
     describe("Testsuite 1 - Verify all fundamental functionalities of Staking Pool", function () {
         it ("normal user fails to reinitalize the pool", async function () {
-            await expect(poolToken.connect(user1).initialize(tokenLFW.address, false, 10, user1.address))
+            const currentBlock = await ethers.provider.getBlockNumber();
+            await expect(poolToken.connect(user1).initialize(tokenLFW.address, false, 10, currentBlock, user1.address))
                 .to.be.revertedWith("Ownable: caller is not the owner")
         });
     
@@ -133,7 +135,7 @@ describe("LFWIDOPoolToken", function () {
     
         it("failed to unstake a bigger amount than staked LFW tokens", async function () {
             await expect(poolToken.connect(user1).unStake(BigNumber.from(51).mul(etherUnit)))
-                .to.be.revertedWith("You do not stake enough to withdraw such amount");
+                .to.be.revertedWith("You did not stake enough to withdraw such amount");
         });
     });
 

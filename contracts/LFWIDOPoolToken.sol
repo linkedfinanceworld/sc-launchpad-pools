@@ -4,7 +4,6 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol"; 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol"; 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -16,15 +15,13 @@ contract LFWIDOPoolToken is
         ReentrancyGuard, 
         ERC20("LFW-IDO-Pool-Token", "LFW-IDO-Token") 
 {
-
-    using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
 
     event Stake(address indexed wallet, uint256 amount);
     event Unstake(address indexed user, uint256 amount);
-    event Claimed(address indexed wallet, uint256 amount);
-    event ChangeAPYvalue(uint256 amount);
+    event Claim(address indexed wallet, uint256 amount);
+    event ChangeApyValue(uint256 amount);
 
     // 30 days to block
     uint256 internal constant BLOCK_COUNT_IN_14_DAYS = 403200;
@@ -36,15 +33,15 @@ contract LFWIDOPoolToken is
     bool internal isInitialized;
 
     // Whether the pool's staked token balance can be removed by owner
-    bool public isRemovable;
+    bool public isPoolClosed;
 
     // The staked token
     ERC20 public stakedToken;
 
-    // The startBlock
+    // The block number when the pool is opened
     uint256 public startBlock;
 
-    // The endBlock (artificial one for FE)
+    // The block number when the pool is closed (artificial one for FE)
     uint256 public endBlock = 100000000000;
 
     // APY
@@ -67,13 +64,14 @@ contract LFWIDOPoolToken is
     /*
      * @notice Initialize the contract
      * @param _stakedToken: staked token address
-     * @param _isRemovable: whether the pool is removed or not (should set to false at the beginning)
-     * @param apy_: staking pool APY
+     * @param _isPoolClosed: whether the pool is closed or not (should set to false at the beginning)
+     * @param _apy: staking pool APY
+     * @param _startBlock: the block number when the pool is opened
      * @param _admin: admin address with ownership
      */
     function initialize(
         ERC20 _stakedToken,
-        bool _isRemovable,
+        bool _isPoolClosed,
         uint256 _apy,
         uint256 _startBlock,
         address _admin
@@ -85,7 +83,7 @@ contract LFWIDOPoolToken is
         // Make this contract initialized
         isInitialized = true;
         stakedToken = _stakedToken;
-        isRemovable = _isRemovable;
+        isPoolClosed = _isPoolClosed;
         apy = _apy;
         startBlock = _startBlock;
         // Transfer ownership to the admin address who becomes owner of the contract
@@ -97,7 +95,7 @@ contract LFWIDOPoolToken is
      * @param userAddress: the address of user who are receiving reward
      * @param blockNumber: the block number as the point for reward calculation
      */    
-    function calculatePendingReward(address userAddress, uint256 blockNumber) internal view returns (uint256) {
+    function calculateReward(address userAddress, uint256 blockNumber) internal view returns (uint256) {
         UserInfo storage user = userInfo[userAddress];
         uint256 stakingPeriod;
         
@@ -114,42 +112,45 @@ contract LFWIDOPoolToken is
         return rewardInStakingPeriod;
     }
 
+    function userClaimReward(address userAddress, uint256 blockNumber) internal returns (uint256) {
+        UserInfo storage user = userInfo[userAddress];
+        uint256 reward = calculateReward(userAddress, blockNumber);
+        user.lastClaimingTime = blockNumber;
+        ERC20(stakedToken).transfer(userAddress, reward);
+        return reward;
+    }
+
     /*
      * @notice stake/deposit LFW in the pool
-     * @param _amount: amount to stake
+     * @param _amount: the amount of token that user stakes
      */    
     function stake(uint256 _amount) external nonReentrant {
-        require(!isRemovable, "Pool has been removed");
-        require(startBlock <= block.number, "Pool is not started yet");
+        uint256 currentBlock = block.number;
+        
+        require(!isPoolClosed, "Pool has been closed");
+        require(startBlock <= currentBlock, "Pool is not started yet");
         require(_amount > 0, "Negative value is prohibited");
+
         UserInfo storage user = userInfo[msg.sender];
 
         // Push address in list
-        if (user.stakedAmount == 0) {
+        if (user.stakingTime == 0) {
             userList.push(address(msg.sender));
         }
 
         // Receive old reward first to recalculate new reward
         if (user.stakedAmount > 0) {
-            uint256 pending = calculatePendingReward(address(msg.sender), block.number);
-            ERC20(stakedToken).transfer(
-                address(msg.sender),
-                pending
-            );
+            uint256 reward = userClaimReward(address(msg.sender), currentBlock);
+            emit Claim(address(msg.sender), reward);
         }
 
         // Stake token 
         if (_amount > 0) {
             user.stakedAmount = user.stakedAmount.add(_amount);
-            IERC20(stakedToken).transferFrom(
-                address(msg.sender),
-                address(this),
-                _amount
-            );
+            IERC20(stakedToken).transferFrom(address(msg.sender), address(this), _amount);
         }
 
         // Update user time variables
-        uint256 currentBlock = block.number;
         user.stakingTime = currentBlock;
         user.lockTime = currentBlock.add(BLOCK_COUNT_IN_14_DAYS); 
         user.lockTimeStamp = block.timestamp + 14 days;
@@ -162,23 +163,19 @@ contract LFWIDOPoolToken is
      * @param _amount: amount to unstake
      */    
     function unStake(uint256 _amount) external nonReentrant {
+        uint256 currentBlock = block.number;
         UserInfo storage user = userInfo[msg.sender];
-        require(
-            user.stakedAmount >= _amount, 
-            "You do not stake enough to withdraw such amount"
+        require(_amount <= user.stakedAmount,
+            "You did not stake enough to withdraw such amount"
         );
-        require(
-            user.lockTime < block.number,
+        require(user.lockTime < currentBlock,
             "Your token is still at the 14-days locked period!"
         );
 
         // Receive old reward first to recalculate new reward
         if (user.stakedAmount > 0) {
-            uint256 pending = calculatePendingReward(address(msg.sender), block.number);
-            ERC20(stakedToken).transfer(
-                address(msg.sender),
-                pending
-            );
+            uint256 reward = userClaimReward(address(msg.sender), currentBlock);
+            emit Claim(address(msg.sender), reward);
         }
 
         // Transfer LFW to user
@@ -192,16 +189,12 @@ contract LFWIDOPoolToken is
      * @notice claim LFW reward
      */       
     function claim() external nonReentrant {
-        UserInfo storage user = userInfo[msg.sender];
-        require(
-            user.stakedAmount > 0, 
-            "You do not stake anything"
-        );
         uint256 currentBlock = block.number;
-        uint256 pending = calculatePendingReward(address(msg.sender), currentBlock);
-        user.lastClaimingTime = currentBlock;
-        ERC20(stakedToken).transfer(address(msg.sender), pending);
-        emit Claimed(address(msg.sender), pending);
+        UserInfo storage user = userInfo[msg.sender];
+        require(user.stakedAmount > 0, "You do not stake anything");
+
+        uint256 reward = userClaimReward(address(msg.sender), currentBlock);
+        emit Claim(address(msg.sender), reward);
     }
 
     /*
@@ -210,31 +203,31 @@ contract LFWIDOPoolToken is
      */       
     function changeAPY(uint256 _apy) external onlyOwner {
         apy = _apy;
-        emit ChangeAPYvalue(_apy);
+        emit ChangeApyValue(_apy);
     }
 
     /*
      * @notice set remove pool
      */       
-    function setRemovePool(bool _remove) external onlyOwner {
-        isRemovable = _remove; 
+    function setPoolClosed(bool _isPoolClosed) external onlyOwner {
+        isPoolClosed = _isPoolClosed; 
     }
 
     // function for FE
     function viewCountDown(address _usr) public view returns(uint256) {
         UserInfo storage user = userInfo[_usr];
         uint256 currentBlock = block.number;
-        uint256 cd;
+        uint256 remainingBlocksTillUnlock;
         if (user.stakedAmount == 0) {
-            cd = 0;
+            remainingBlocksTillUnlock = 0;
         } else {
-            if (user.lockTime - currentBlock > 0) {
-                cd = user.lockTime - currentBlock;
+            if (currentBlock < user.lockTime) {
+                remainingBlocksTillUnlock = user.lockTime - currentBlock;
             } else {
-                cd = 0;
+                remainingBlocksTillUnlock = 0;
             }
         }
-        return cd;
+        return remainingBlocksTillUnlock;
     }
 
     /*
