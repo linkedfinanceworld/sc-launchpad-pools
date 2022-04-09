@@ -17,14 +17,17 @@ contract LFWIDOPoolToken is
 {
     using SafeMath for uint256;
 
-
     event Stake(address indexed wallet, uint256 amount);
     event Unstake(address indexed user, uint256 amount);
     event Claim(address indexed wallet, uint256 amount);
     event ChangeApyValue(uint256 amount);
 
-    // 30 days to block
-    uint256 internal constant BLOCK_COUNT_IN_14_DAYS = 403200;
+    // 14 days to block
+    // uint256 internal constant BLOCK_COUNT_IN_14_DAYS = 403200;
+
+    // FIXME this is for testing on staging
+    // remove this when going on production
+    uint256 internal constant BLOCK_COUNT_IN_14_DAYS = 40; //2 minutes
 
     // 1 year block to calculate apy
     uint256 internal constant BLOCK_COUNT_IN_1_YEAR = 10512000;
@@ -42,7 +45,7 @@ contract LFWIDOPoolToken is
     uint256 public startBlock;
 
     // The block number when the pool is closed (artificial one for FE)
-    uint256 public endBlock = 100000000000;
+    uint256 public endBlock = 100000000000; // as big as possible
 
     // APY
     uint256 public apy;
@@ -95,7 +98,8 @@ contract LFWIDOPoolToken is
      * @param userAddress: the address of user who are receiving reward
      * @param blockNumber: the block number as the point for reward calculation
      */    
-    function calculateReward(address userAddress, uint256 blockNumber) internal view returns (uint256) {
+    function calculateReward(address userAddress) public view returns (uint256) {
+        uint256 blockNumber = block.number;
         UserInfo storage user = userInfo[userAddress];
         uint256 stakingPeriod;
         
@@ -112,10 +116,10 @@ contract LFWIDOPoolToken is
         return rewardInStakingPeriod;
     }
 
-    function userClaimReward(address userAddress, uint256 blockNumber) internal returns (uint256) {
+    function userClaimReward(address userAddress) internal returns (uint256) {
         UserInfo storage user = userInfo[userAddress];
-        uint256 reward = calculateReward(userAddress, blockNumber);
-        user.lastClaimingTime = blockNumber;
+        uint256 reward = calculateReward(userAddress);
+        user.lastClaimingTime = block.number;
         ERC20(stakedToken).transfer(userAddress, reward);
         return reward;
     }
@@ -140,7 +144,7 @@ contract LFWIDOPoolToken is
 
         // Receive old reward first to recalculate new reward
         if (user.stakedAmount > 0) {
-            uint256 reward = userClaimReward(address(msg.sender), currentBlock);
+            uint256 reward = userClaimReward(address(msg.sender));
             emit Claim(address(msg.sender), reward);
         }
 
@@ -168,13 +172,13 @@ contract LFWIDOPoolToken is
         require(_amount <= user.stakedAmount,
             "You did not stake enough to withdraw such amount"
         );
-        require(user.lockTime < currentBlock,
+        require(user.lockTime <= currentBlock,
             "Your token is still at the 14-days locked period!"
         );
 
         // Receive old reward first to recalculate new reward
         if (user.stakedAmount > 0) {
-            uint256 reward = userClaimReward(address(msg.sender), currentBlock);
+            uint256 reward = userClaimReward(address(msg.sender));
             emit Claim(address(msg.sender), reward);
         }
 
@@ -189,11 +193,10 @@ contract LFWIDOPoolToken is
      * @notice claim LFW reward
      */       
     function claim() external nonReentrant {
-        uint256 currentBlock = block.number;
         UserInfo storage user = userInfo[msg.sender];
-        require(user.stakedAmount > 0, "You do not stake anything");
+        require(user.stakedAmount > 0, "You did not stake anything");
 
-        uint256 reward = userClaimReward(address(msg.sender), currentBlock);
+        uint256 reward = userClaimReward(address(msg.sender));
         emit Claim(address(msg.sender), reward);
     }
 
@@ -207,7 +210,7 @@ contract LFWIDOPoolToken is
     }
 
     /*
-     * @notice set remove pool
+     * @notice used to close pool if needed
      */       
     function setPoolClosed(bool _isPoolClosed) external onlyOwner {
         isPoolClosed = _isPoolClosed; 

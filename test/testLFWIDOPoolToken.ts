@@ -93,7 +93,7 @@ describe("LFWIDOPoolToken", function () {
     
         
         it("user cannot claim if hasn't staked", async function () {       
-            await expect(poolToken.connect(user1).claim()).to.be.revertedWith("You do not stake anything");
+            await expect(poolToken.connect(user1).claim()).to.be.revertedWith("You did not stake anything");
         });
     
         it("user stakes some LFW tokens, then claims reward", async function () {       
@@ -115,7 +115,7 @@ describe("LFWIDOPoolToken", function () {
             
             // simulate fast-winding time
             // here at the momment just before 11 days passed
-            await ethers.provider.send("hardhat_mine", ["0x4D57D"]); 
+            await ethers.provider.send("hardhat_mine", ["0x4D57C"]); 
             await expect(poolToken.connect(user1).unStake(BigNumber.from(10).mul(etherUnit)))
                 .to.be.revertedWith("Your token is still at the 14-days locked period!");
         });
