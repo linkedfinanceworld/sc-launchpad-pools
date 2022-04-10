@@ -103,8 +103,8 @@ describe("LFWIDOPoolToken", function () {
                 .withArgs(user1.address, BigNumber.from(100).mul(etherUnit));
 
             // another user can check total staked tokens
-            expect(await poolToken.connect(user2).totalStakedAmountInEther()).to.eq(BigNumber.from(100));
-            expect(await poolToken.connect(user2).totalUsers()).to.eq(1);
+            expect(await poolToken.connect(owner).totalStakedAmountInEther()).to.eq(BigNumber.from(100));
+            expect(await poolToken.connect(owner).totalUsers()).to.eq(1);
     
             await ethers.provider.send("hardhat_mine", ["0x15180"]); // block count of 3 days
             // console.log("block number after fast-winding 3 days: ", await ethers.provider.getBlockNumber());
@@ -135,8 +135,8 @@ describe("LFWIDOPoolToken", function () {
                 .to.emit(poolToken, 'Unstake')
                 .withArgs(user1.address, BigNumber.from(50).mul(etherUnit));
 
-            expect(await poolToken.connect(user2).totalStakedAmountInEther()).to.eq(BigNumber.from(50));
-            expect(await poolToken.connect(user2).totalUsers()).to.eq(1);
+            expect(await poolToken.connect(owner).totalStakedAmountInEther()).to.eq(BigNumber.from(50));
+            expect(await poolToken.connect(owner).totalUsers()).to.eq(1);
             
         });
     

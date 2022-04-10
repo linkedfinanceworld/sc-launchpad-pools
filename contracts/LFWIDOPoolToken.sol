@@ -245,7 +245,7 @@ contract LFWIDOPoolToken is
     /*
      * @notice total amount of tokens that have been staked by users
      */
-    function totalStakedAmount() public view returns (uint256) {
+    function totalStakedAmount() public view onlyOwner returns (uint256) {
         uint256 numberOfUsers = userList.length;
         uint256 total = 0;
         for (uint256 i = 0; i < numberOfUsers; i++) {
@@ -258,7 +258,7 @@ contract LFWIDOPoolToken is
     /*
      * @notice total amount of tokens (in Ether unit) that have been staked by users
      */
-    function totalStakedAmountInEther() public view returns (uint256) {
+    function totalStakedAmountInEther() external view onlyOwner returns (uint256) {
         uint256 total = totalStakedAmount();
         return total.div(1 ether);
     }
