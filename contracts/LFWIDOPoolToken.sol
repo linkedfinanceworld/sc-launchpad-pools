@@ -233,6 +233,44 @@ contract LFWIDOPoolToken is
         return remainingBlocksTillUnlock;
     }
 
+
+    /*
+     * @notice total of tokens in pool (this is different to total of tokens that staked by users)
+     */
+    function totalSupply() public view override returns (uint256) {
+        return stakedToken.balanceOf(address(this));
+    }
+
+
+    /*
+     * @notice total amount of tokens that have been staked by users
+     */
+    function totalStakedAmount() public view returns (uint256) {
+        uint256 numberOfUsers = userList.length;
+        uint256 total = 0;
+        for (uint256 i = 0; i < numberOfUsers; i++) {
+            total += userInfo[userList[i]].stakedAmount;
+        }
+        return total;
+    }
+
+
+    /*
+     * @notice total amount of tokens (in Ether unit) that have been staked by users
+     */
+    function totalStakedAmountInEther() public view returns (uint256) {
+        uint256 total = totalStakedAmount();
+        return total.div(1 ether);
+    }
+
+    /*
+     * @notice return total of tokens in pool that have been staked by all users
+     */
+    function totalUsers() public view returns (uint256) {
+        return userList.length;
+    }
+
+
     /*
      * @notice Withdraw staked tokens without caring about rewards rewards
      * @dev Needs to be for emergency.

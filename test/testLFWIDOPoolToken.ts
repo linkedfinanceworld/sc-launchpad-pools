@@ -101,6 +101,10 @@ describe("LFWIDOPoolToken", function () {
             await expect(poolToken.connect(user1).stake(BigNumber.from(100).mul(etherUnit)))
                 .to.emit(poolToken, 'Stake')
                 .withArgs(user1.address, BigNumber.from(100).mul(etherUnit));
+
+            // another user can check total staked tokens
+            expect(await poolToken.connect(user2).totalStakedAmountInEther()).to.eq(BigNumber.from(100));
+            expect(await poolToken.connect(user2).totalUsers()).to.eq(1);
     
             await ethers.provider.send("hardhat_mine", ["0x15180"]); // block count of 3 days
             // console.log("block number after fast-winding 3 days: ", await ethers.provider.getBlockNumber());
@@ -130,6 +134,9 @@ describe("LFWIDOPoolToken", function () {
                 .to.emit(poolToken, 'Claim')
                 .to.emit(poolToken, 'Unstake')
                 .withArgs(user1.address, BigNumber.from(50).mul(etherUnit));
+
+            expect(await poolToken.connect(user2).totalStakedAmountInEther()).to.eq(BigNumber.from(50));
+            expect(await poolToken.connect(user2).totalUsers()).to.eq(1);
             
         });
     
@@ -162,6 +169,11 @@ describe("LFWIDOPoolToken", function () {
             expect(await tokenLFW.balanceOf(user2.address)).to.equal(BigNumber.from(0).mul(etherUnit))
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
             console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
+
+            // owner checks some info
+            expect(await poolToken.connect(owner).totalUsers()).to.eq(2);
+            // 50 (user1) + 1000 (user2)
+            expect(await poolToken.connect(owner).totalStakedAmountInEther()).to.eq(BigNumber.from(1050));      
         });
 
         it("user claims reward at day-5", async function () {
@@ -189,6 +201,9 @@ describe("LFWIDOPoolToken", function () {
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
             console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
 
+            // owner checks some info
+            expect(await poolToken.connect(owner).totalUsers()).to.eq(2);
+            expect(await poolToken.connect(owner).totalStakedAmountInEther()).to.eq(BigNumber.from(1050));  
         });
 
         it("user unstakes 600 LFW at day-14", async function () {
@@ -211,6 +226,10 @@ describe("LFWIDOPoolToken", function () {
             const tmp_value = BigNumber.from(Math.round((600 + expectedReward)*1e8)); 
             const balance = await tokenLFW.balanceOf(user2.address);
             expect(BigNumber.from(balance).div(BigNumber.from(10).pow(10))).to.equal(tmp_value);
+
+            // owner checks some info
+            expect(await poolToken.connect(owner).totalUsers()).to.eq(2);
+            expect(await poolToken.connect(owner).totalStakedAmountInEther()).to.eq(BigNumber.from(450));  
         });
 
         it("user stakes 500 LFW at day-16", async function () {
@@ -223,7 +242,10 @@ describe("LFWIDOPoolToken", function () {
 
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
             console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
-            
+
+            // owner checks some info
+            expect(await poolToken.connect(owner).totalUsers()).to.eq(2);
+            expect(await poolToken.connect(owner).totalStakedAmountInEther()).to.eq(BigNumber.from(950));  
         });
 
         it("user claims reward at day-18", async function () {
@@ -254,8 +276,11 @@ describe("LFWIDOPoolToken", function () {
 
             const userTokenBalance2 = await tokenLFW.balanceOf(user2.address);
             console.log("The amount of LFW that the user owns: ", formatEther(userTokenBalance2));
-
             console.log("roughly, reward = 1000*0.1*14/365 + 400*0.1*2/365 + 900*0.1*14/365 = 7.50684931507");
+
+            // owner checks some info
+            expect(await poolToken.connect(owner).totalUsers()).to.eq(2);
+            expect(await poolToken.connect(owner).totalStakedAmountInEther()).to.eq(BigNumber.from(50));  
         });
     });
 
