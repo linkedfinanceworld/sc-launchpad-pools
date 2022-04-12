@@ -23,11 +23,11 @@ contract LFWIDOPoolToken is
     event ChangeApyValue(uint256 amount);
 
     // 14 days to block
-    // uint256 internal constant BLOCK_COUNT_IN_14_DAYS = 403200;
+    uint256 internal constant BLOCK_COUNT_IN_14_DAYS = 403200;
 
     // FIXME this is for testing on staging
     // remove this when going on production
-    uint256 internal constant BLOCK_COUNT_IN_14_DAYS = 40; //2 minutes
+    // uint256 internal constant BLOCK_COUNT_IN_14_DAYS = 40; //2 minutes
 
     // 1 year block to calculate apy
     uint256 internal constant BLOCK_COUNT_IN_1_YEAR = 10512000;
