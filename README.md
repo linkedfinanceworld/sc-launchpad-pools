@@ -1,13 +1,19 @@
-# install all the packages
+# Basic commands
+
+```shell
+# 1. Install all the packages
 npm ci 
-# run unit test
+# 2. Run unit test
 npx hardhat test 
-# change config before deployment
-make a copy of .env.example and rename the copy to .env . Fill in your private key, api key there before run deployment. Gitignore contains .env already, so your private key won't be pushed to git repo
-# run deploy
+# 3. Change config before deployment.
+# First, make a copy of .env.example and rename the copy to .env . 
+# Then, fill your PRIVATE_KEY, BSCSCAN_API_KEY, BSC_TESNET_URL in .env file. 
+# (Gitignore file contains .env already, so your private key won't be pushed to git repo)
+# 4. run deploy
 npx hardhat run --network bsc_testnet .\scripts\deploy.ts 
-# run verify
+# 5. run verify
 npx hardhat verify --network bsc_testnet {contract_address}
+```
 
 
 
